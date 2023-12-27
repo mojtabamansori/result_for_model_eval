@@ -1,46 +1,44 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+from lazypredict.Supervised import LazyClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import GridSearchCV
+
 alg = ['HUGO', 'LSB', 'WOW', 'SUNIWARD']
 i_path = [0.1, 0.2, 0.3, 0.4]
-for i in i_path:
-    for i2 in alg:
-        file_path = f'{i}/Yedroudj_{i2}_5000bosstrain_1500valid_no_DA_v1.npz'
+fea = [836, 1858]
+tra = ['train', 'test']
 
-        # Load the .npz file
-        data = np.load(file_path)
+for payload in i_path:
+    for algo in alg:
+        for nro in fea:
+            for splite in tra:
+                file_path_train = f'exel_output/{algo}, {payload}, {nro}, train.csv'
+                df = pd.read_csv(file_path_train)
+                x_train = df.iloc[:, :-1]
+                y_train = df.iloc[:, -1]
 
-        # Extract data
-        loss_train_log = data['loss_train_log']
-        DAC_train_log = data['DAC_train_log']
-        DAC_valid_log = data['DAC_valid_log']
+                file_path_test = f'exel_output/{algo}, {payload}, {nro}, test.csv'
+                df = pd.read_csv(file_path_test)
+                x_test = df.iloc[:, :-1]
+                y_test = df.iloc[:, -1]
 
-        # Close the file
-        data.close()
+                scaler = StandardScaler()
+                x_train_scaled = scaler.fit_transform(x_train)
+                x_test_scaled = scaler.transform(x_test)
 
-        plt.figure(figsize=(10, 8))
-        plt.subplot(311)
-        plt.plot(loss_train_log, label='Training Loss', color='blue')
-        plt.title('Training Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend()
-        plt.subplot(312)
-        plt.plot(DAC_train_log, label='Training DAC', color='green')
-        plt.title('Training DAC')
-        plt.xlabel('Epoch')
-        plt.ylabel('DAC')
-        plt.ylim(50,100)
-        plt.legend()
-        plt.subplot(313)
-        plt.plot(DAC_valid_log, label='Validation DAC', color='red')
-        plt.title('Validation DAC')
-        plt.xlabel('Epoch')
-        plt.ylabel('DAC')
-        plt.ylim(50,100)
-        plt.legend()
+                param_grid = {'n_neighbors': [1, 3, 5, 7, 10]}
+                knn_classifier = KNeighborsClassifier()
+                grid_search = GridSearchCV(knn_classifier, param_grid, cv=5)
+                grid_search.fit(x_train_scaled, y_train)
+                best_params = grid_search.best_params_
 
-        # Adjust layout
-        plt.tight_layout()
-
-        # Show the plot
-        plt.savefig(f'{i}_{i2}_result.png')
+                final_knn_classifier = KNeighborsClassifier(n_neighbors=best_params['n_neighbors'])
+                final_knn_classifier.fit(x_train_scaled, y_train)
+                y_pred = final_knn_classifier.predict(x_test_scaled)
+                accuracy = accuracy_score(y_test, y_pred)
+                print(f"KNN {algo} {payload} {nro} Accuracy: {accuracy}")
